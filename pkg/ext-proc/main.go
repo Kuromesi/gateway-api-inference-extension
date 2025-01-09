@@ -60,6 +60,11 @@ var (
 		"refreshMetricsInterval",
 		50*time.Millisecond,
 		"interval to refresh metrics")
+	enableFilterConfiguration = flag.Bool(
+		"enableFilterConfiguration",
+		false,
+		"Whether to enable configuring filters in `default/filter-config` configmap, ONLY FOR DEV NOW.",
+	)
 
 	scheme = runtime.NewScheme()
 )
@@ -146,6 +151,17 @@ func main() {
 		klog.Error(err, "Error setting up EndpointSliceReconciler")
 	}
 
+	var orchestrator *scheduling.FilterOrchestratorImpl
+	if *enableFilterConfiguration {
+		if err := (&backend.FilterConfigReconciler{
+			Datastore: datastore,
+			Client:    mgr.GetClient(),
+		}).SetupWithManager(mgr); err != nil {
+			klog.Error(err, "Error setting up FilterConfigReconciler")
+		}
+		orchestrator = scheduling.NewFilterOrchestrator(datastore)
+	}
+
 	errChan := make(chan error)
 	go func() {
 		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
@@ -164,7 +180,8 @@ func main() {
 		s,
 		handlers.NewServer(
 			pp,
-			scheduling.NewScheduler(pp),
+			// when orchestrator is nil, default filter will be returned
+			scheduling.NewScheduler(pp, scheduling.WithOrchestrator(orchestrator)),
 			*targetPodHeader,
 			datastore))
 	healthPb.RegisterHealthServer(s, &healthServer{})
