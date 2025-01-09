@@ -151,7 +151,7 @@ func main() {
 		klog.Error(err, "Error setting up EndpointSliceReconciler")
 	}
 
-	orchestrator := &scheduling.FilterOrchestratorImpl{}
+	var orchestrator scheduling.FilterOrchestrator
 	if *enableFilterConfiguration {
 		if err := (&backend.FilterConfigReconciler{
 			Datastore: datastore,
